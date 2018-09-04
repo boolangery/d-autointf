@@ -90,9 +90,9 @@ struct InterfaceInfo(T, TCtx : UserContext = UserContext)
 
     /// Static (compile-time) information about each route
     static if (methodCount)
-        static const StaticMethodInfo[methodCount] staticRoutes = computeStaticRoutes();
+        static const StaticMethodInfo[methodCount] staticMethods = computeStaticRoutes();
     else
-        static const StaticMethodInfo[0] staticRoutes;
+        static const StaticMethodInfo[0] staticMethods;
 
     /** Aliases for each sub interface method
 		This array has the same number of entries as `subInterfaces` and
@@ -137,19 +137,19 @@ struct InterfaceInfo(T, TCtx : UserContext = UserContext)
 
         foreach (si, RF; Methods)
         {
-            enum sroute = staticRoutes[si];
+            enum smethod = staticMethods[si];
 
             MethodInfo route;
-            route.name = sroute.name;
+            route.name = smethod.name;
 
-            route.parameters.length = sroute.parameters.length;
+            route.parameters.length = smethod.parameters.length;
 
             bool prefix_id = false;
 
             alias PT = ParameterTypeTuple!RF;
             foreach (i, _; PT)
             {
-                enum sparam = sroute.parameters[i];
+                enum sparam = smethod.parameters[i];
                 ParameterInfo pi;
                 pi.name = sparam.name;
 
