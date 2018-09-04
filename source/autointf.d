@@ -64,8 +64,6 @@ struct InterfaceInfo(T)
     else
         alias I = BaseInterfaces[0];
 
-    /// Get interface attributes
-    enum attributes = __traits(getAttributes, T);
 
     /// The name of each interface member
     enum memberNames = [__traits(allMembers, I)];
@@ -371,9 +369,6 @@ unittest
     }
 
     alias info = InterfaceInfo!IAPI;
-
-    static assert(info.attributes.length == 1);
-    static assert(info.attributes[0] == "api");
 
     static assert(info.memberNames.length == 2);
     static assert(info.memberNames[0] == "hello");
