@@ -460,7 +460,7 @@ unittest
 {
     class AutoFunctionName(I) : I
     {
-        RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info, ARGS arg)
+        private RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info, ARGS arg)
         {
             import std.traits;
             import std.conv : to;
@@ -507,5 +507,4 @@ unittest
     assert(api.hello(42, "foo") == "hello42foo");
     assert(api.helloWorld() == "helloWorld");
     assert(api.getNumber(12) == "getNumber12");
-
 }

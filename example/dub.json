@@ -1,0 +1,12 @@
+{
+	"name": "autointf-example",
+	"authors": [
+		"Eliott Dumeix"
+	],
+	"dependencies": {
+		"autointf": "~master"
+	},
+	"description": "Example application for autointf",
+	"copyright": "Copyright © 2018, Eliott Dumeix",
+	"license": "MIT"
+}

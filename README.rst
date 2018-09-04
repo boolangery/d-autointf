@@ -12,23 +12,36 @@ template function.
 Installation:
 ------------------------------------------------------------------------------
 
-TODO
+Using dub:
+
+.. code-block:: json
+
+    "dependencies": {
+        "autointf": "*"
+    }
+
 
 
 Quickstart
 ==============================================================================
 
-To start you must define a class like below:
+See example app:
+
 
 .. code-block:: d
 
     import std.stdio;
+    import autointf;
 
-    class AutoDescribe(I) : AutoInterfaceImpl!I
+
+    class AutoJsonRpc(I) : I
     {
-        RT executeMethod(I, TCtx, RT, int n, ARGS...)(ref InterfaceInfo!(I, TCtx) info, ARGS args)
+        private int id;
+
+        private RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info, ARGS args)
         {
             import std.traits;
+            import std.array : join;
             import std.conv : to;
 
             // retrieve some compile time informations
@@ -37,59 +50,33 @@ To start you must define a class like below:
             alias PTT   = ParameterTypeTuple!Func;
             auto method = info.methods[n];
 
-            string ret;
-            import std.stdio;
+            string[] params;
+            foreach (i, PT; PTT)
+                params ~= to!string(args[i]);
 
-            foreach (i, PT; PTT) {
-                auto param = method.parameters[i];
-                ret ~= "\t" ~ param.name ~ "(" ~ PT.stringof ~ ") = " ~ to!string(args[i]) ~ "\n";
-            }
-
-            return method.name ~ ":\n" ~ ret;
+            return `{"jsonrpc": "2.0", "method": "` ~ method.name ~ `", "params": [`
+                ~ params.join(",") ~ `], "id": ` ~ (id++).to!string() ~ "}";
         }
 
         mixin(autoImplementMethods!I());
     }
 
+
     interface IAPI
     {
-        string hello(int number, string str);
+        string helloWorld(int number, string str);
+
+        @noAutoImplement()
+        final string foo() { return "foo"; }
     }
 
-    auto api = new AutoDescribe!IAPI();
+    void main()
+    {
+        auto api = new AutoJsonRpc!IAPI();
 
+        writeln(api.helloWorld(42, "foo"));
+        // > {"jsonrpc": "2.0", "method": "helloWorld", "params": [42,foo], "id": 0}
 
-    writeln(api.hello(42, "foo"));
-    // hello:
-    //     number(int) = 42
-    //     str(string) = foo
-
-
-The class must inherits from AutoInterfaceImpl (it contains some compile time things).
-
-Then you must declare the method "executeMethod" with this signature:
-
-.. code-block:: d
-
-    /**
-    Params:
-        I = The interface to implement type.
-        TCtx = Context type.
-        TR = Method return type.
-        n = Method index inside info argument.
-        ARGS... = method arguments type.
-
-        info = An InterfaceInfo object.
-        args = Args value.
-    **/
-    RT executeMethod(I, TCtx, RT, int n, ARGS...)(ref InterfaceInfo!(I, TCtx) info, ARGS args)
-
-This method is used as implementation in auto-implemented interface.
-
-Finally you must call:
-
-.. code-block:: d
-
-    mixin(autoImplementMethods!I());
-
-to implement your interface with the given "executeMethod".
+        writeln(api.foo());
+        // > foo
+    }

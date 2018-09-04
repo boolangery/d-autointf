@@ -1,0 +1,5 @@
+.dub/
+.idea/
+autointf-test-library
+autointf.iml
+dub.selections.json

@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+autointf-example.so
+autointf-example.dylib
+autointf-example.dll
+autointf-example.a
+autointf-example.lib
+autointf-example-test-*
+*.exe
+*.o
+*.obj
+*.lst
+autointf-example
+dub.selections.json
