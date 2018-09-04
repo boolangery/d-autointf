@@ -29,14 +29,14 @@ class UserContext
 {
 }
 
-struct SubInterface(TCtx : UserContext)
+struct SubInterface
 {
-    TCtx context;
+
 }
 
 /// Provides all necessary informations to implement an automated interface or class.
 /// inspired by /web/vibe/web/internal/rest/common.d
-struct InterfaceInfo(T, TCtx : UserContext = UserContext)
+struct InterfaceInfo(T)
         if (is(T == class) || is(T == interface))
 {
 @safe:
@@ -49,9 +49,6 @@ struct InterfaceInfo(T, TCtx : UserContext = UserContext)
     import vibe.internal.meta.funcattr : IsAttributedParameter;
     import vibe.internal.meta.traits : derivedMethod;
     import vibe.internal.meta.uda;
-
-    /// The settings used to generate the interface
-    TCtx context;
 
     // determine the implementation interface I and check for validation errors
     private alias BaseInterfaces = InterfacesTuple!T;
@@ -112,18 +109,14 @@ struct InterfaceInfo(T, TCtx : UserContext = UserContext)
 		This array has the same number of entries as `SubInterfaceFunctions` and
 		`SubInterfaceTypes`.
 	*/
-    SubInterface!TCtx[subInterfaceCount] subInterfaces;
+    SubInterface[subInterfaceCount] subInterfaces;
 
     /** Fills the struct with information.
 		Params:
 			settings = Optional settings object.
 	*/
-    this(TCtx context)
+    this(int dummy)
     {
-        import vibe.internal.meta.uda : findFirstUDA;
-
-        this.context = context;
-
         computeMethods();
         computeSubInterfaces();
     }
@@ -400,41 +393,30 @@ unittest
 /**
 	Implements the given interface using a global function with the following signature:
 
-	RT executeMethod(I, TCtx, RT, int n, ARGS...)(ref InterfaceInfo!(I, TCtx) info)
+	RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info)
 
     With:
         I = The interface to implement type.
-        TCtx = Context type.
         TR = Method return type.
         n = Method index inside info argument.
         ARGS... = method arguements.
         info = An InterfaceInfo object.
 **/
-public class AutoInterfaceImpl(I, TCtx : UserContext = UserContext)
+public class AutoInterfaceImpl(I)
 {
     import std.typetuple : staticMap;
 
-    public alias TContext = TCtx;
-    public alias Info = InterfaceInfo!(I, TCtx);
+    public alias Info = InterfaceInfo!I;
 
     // storing this struct directly causes a segfault when built with
     // LDC 0.15.x, so we are using a pointer here:
-    public InterfaceInfo!(I, TCtx)* infos;
+    public InterfaceInfo!I* infos;
     private staticMap!(AutoInterfaceImpl, Info.SubInterfaceTypes) m_subInterfaces;
 
     /// Creates a new REST client implementation of $(D I).
     this()
     {
-        infos = new Info(null);
-
-        foreach (i, SI; Info.SubInterfaceTypes)
-            m_subInterfaces[i] = new AutoInterfaceImpl!SI(infos.subInterfaces[i].settings);
-    }
-
-    /// Creates a new REST client implementation of $(D I).
-    this(TCtx settings)
-    {
-        infos = new Info(settings);
+        infos = new Info(0);
 
         foreach (i, SI; Info.SubInterfaceTypes)
             m_subInterfaces[i] = new AutoInterfaceImpl!SI(infos.subInterfaces[i].settings);
@@ -495,7 +477,7 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
 			mixin CloneFunction!(Info.Methods[%1$s], q{
 				import std.traits : ReturnType;
         		alias RT = ReturnType!(Info.Methods[%1$s]);
-				return %3$s!(I, TContext, RT, %1$s)(*infos, %2$s);
+				return %3$s!(I, RT, %1$s)(*infos, %2$s);
 			});
 		}.format(i, pnames, globalMethodName);
     }
@@ -503,19 +485,12 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
     return ret;
 }
 
-version (unittest)
-{
-    class SomeContext : UserContext
-    {
-        public int bar = 42;
-    }
-}
 
 unittest
 {
-    class AutoFunctionName(I) : AutoInterfaceImpl!(I, SomeContext)
+    class AutoFunctionName(I) : AutoInterfaceImpl!I
     {
-        RT executeMethod(I, TCtx, RT, int n, ARGS...)(ref InterfaceInfo!(I, TCtx) info, ARGS arg)
+        RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info, ARGS arg)
         {
             import std.traits;
             import std.conv : to;
@@ -525,8 +500,6 @@ unittest
             alias RT = ReturnType!Func;
             alias PTT = ParameterTypeTuple!Func;
             auto route = info.methods[n];
-
-            assert(info.context.bar == 42, "context must be the same");
 
             string ret;
 
@@ -539,12 +512,6 @@ unittest
         }
 
         mixin(autoImplementMethods!I());
-
-        this()
-        {
-            // pass some context
-            super(new SomeContext());
-        }
     }
 
     interface ISubAPi
