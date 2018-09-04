@@ -1,0 +1,12 @@
+{
+	"name": "autointf",
+	"authors": [
+		"Eliott Dumeix"
+	],
+	"description": "Auto interface implementation generator.",
+	"license": "MIT",
+	"targetType": "library",
+	"dependencies": {
+		"vibe-d:utils": "~>0.8.4"
+	}
+}
