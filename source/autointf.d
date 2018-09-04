@@ -419,25 +419,25 @@ public class AutoInterfaceImpl(I, TCtx : UserContext = UserContext)
 
     // storing this struct directly causes a segfault when built with
     // LDC 0.15.x, so we are using a pointer here:
-    private InterfaceInfo!(I, TCtx)* _infos;
+    public InterfaceInfo!(I, TCtx)* infos;
     private staticMap!(AutoInterfaceImpl, Info.SubInterfaceTypes) m_subInterfaces;
 
     /// Creates a new REST client implementation of $(D I).
     this()
     {
-        _infos = new Info(null);
+        infos = new Info(null);
 
         foreach (i, SI; Info.SubInterfaceTypes)
-            m_subInterfaces[i] = new AutoInterfaceImpl!SI(_infos.subInterfaces[i].settings);
+            m_subInterfaces[i] = new AutoInterfaceImpl!SI(infos.subInterfaces[i].settings);
     }
 
     /// Creates a new REST client implementation of $(D I).
     this(TCtx settings)
     {
-        _infos = new Info(settings);
+        infos = new Info(settings);
 
         foreach (i, SI; Info.SubInterfaceTypes)
-            m_subInterfaces[i] = new AutoInterfaceImpl!SI(_infos.subInterfaces[i].settings);
+            m_subInterfaces[i] = new AutoInterfaceImpl!SI(infos.subInterfaces[i].settings);
     }
 }
 
@@ -495,7 +495,7 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
 			mixin CloneFunction!(Info.Methods[%1$s], q{
 				import std.traits : ReturnType;
         		alias RT = ReturnType!(Info.Methods[%1$s]);
-				return %3$s!(I, TContext, RT, %1$s)(*_infos, %2$s);
+				return %3$s!(I, TContext, RT, %1$s)(*infos, %2$s);
 			});
 		}.format(i, pnames, globalMethodName);
     }
