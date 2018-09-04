@@ -1,6 +1,10 @@
 autointf
 ===============================================================================
 
+.. image:: https://img.shields.io/dub/v/autointf.svg
+    :target: https://code.dlang.org/packages/autointf
+
+
 An helper-library to auto-generate interface implementation from a
 template function.
 
