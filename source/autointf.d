@@ -390,39 +390,6 @@ unittest
     static assert(is(PTT[0] == int));
 }
 
-/**
-	Implements the given interface using a global function with the following signature:
-
-	RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info)
-
-    With:
-        I = The interface to implement type.
-        TR = Method return type.
-        n = Method index inside info argument.
-        ARGS... = method arguements.
-        info = An InterfaceInfo object.
-**/
-public class AutoInterfaceImpl(I)
-{
-    import std.typetuple : staticMap;
-
-    public alias Info = InterfaceInfo!I;
-
-    // storing this struct directly causes a segfault when built with
-    // LDC 0.15.x, so we are using a pointer here:
-    public InterfaceInfo!I* infos;
-    private staticMap!(AutoInterfaceImpl, Info.SubInterfaceTypes) m_subInterfaces;
-
-    /// Creates a new REST client implementation of $(D I).
-    this()
-    {
-        infos = new Info(0);
-
-        foreach (i, SI; Info.SubInterfaceTypes)
-            m_subInterfaces[i] = new AutoInterfaceImpl!SI(infos.subInterfaces[i].settings);
-    }
-}
-
 string autoImplementMethods(I)(string globalMethodName = "executeMethod")
 {
     import std.array : join;
@@ -434,6 +401,9 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
 
     string ret = q{
 		import vibe.internal.meta.codegen : CloneFunction;
+
+		private alias __Info = InterfaceInfo!I;
+		private InterfaceInfo!I* __infos = new __Info(0);
 	};
 
     // generate sub interface methods
@@ -449,7 +419,7 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
         static if (isInstanceOf!(Collection, RT))
         {
             ret ~= q{
-					mixin CloneFunction!(Info.SubInterfaceFunctions[%1$s], q{
+					mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
 						return Collection!(%2$s)(m_subInterfaces[%1$s]%3$s);
 					});
 				}.format(i, fullyQualifiedName!SI, pnames);
@@ -457,7 +427,7 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
         else
         {
             ret ~= q{
-					mixin CloneFunction!(Info.SubInterfaceFunctions[%1$s], q{
+					mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
 						return m_subInterfaces[%1$s];
 					});
 				}.format(i);
@@ -474,10 +444,10 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
             enum pnames = [ParamNames].join(", ");
 
         ret ~= q{
-			mixin CloneFunction!(Info.Methods[%1$s], q{
+			mixin CloneFunction!(__Info.Methods[%1$s], q{
 				import std.traits : ReturnType;
-        		alias RT = ReturnType!(Info.Methods[%1$s]);
-				return %3$s!(I, RT, %1$s)(*infos, %2$s);
+        		alias RT = ReturnType!(__Info.Methods[%1$s]);
+				return %3$s!(I, RT, %1$s)(*__infos, %2$s);
 			});
 		}.format(i, pnames, globalMethodName);
     }
@@ -488,7 +458,7 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
 
 unittest
 {
-    class AutoFunctionName(I) : AutoInterfaceImpl!I
+    class AutoFunctionName(I) : I
     {
         RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info, ARGS arg)
         {
