@@ -414,8 +414,8 @@ public class AutoInterfaceImpl(I, TCtx : UserContext = UserContext)
 {
     import std.typetuple : staticMap;
 
-    private alias TContext = TCtx;
-    private alias Info = InterfaceInfo!(I, TCtx);
+    public alias TContext = TCtx;
+    public alias Info = InterfaceInfo!(I, TCtx);
 
     // storing this struct directly causes a segfault when built with
     // LDC 0.15.x, so we are using a pointer here:
