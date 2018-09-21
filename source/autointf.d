@@ -368,15 +368,16 @@ unittest
         void disabledMethod();
     }
 
-    alias info = InterfaceInfo!IAPI;
+    alias Info = InterfaceInfo!IAPI;
+    auto info = new Info(0);
 
-    static assert(info.memberNames.length == 2);
-    static assert(info.memberNames[0] == "hello");
-    static assert(info.memberNames[1] == "disabledMethod");
+    static assert(Info.memberNames.length == 2);
+    static assert(Info.memberNames[0] == "hello");
+    static assert(Info.memberNames[1] == "disabledMethod");
 
-    static assert(info.Methods.length == 1);
+    static assert(Info.Methods.length == 1);
 
-    alias Func = info.Methods[0];
+    alias Func = Info.Methods[0];
     alias RT = ReturnType!Func;
     alias PTT = ParameterTypeTuple!Func;
 
@@ -398,7 +399,12 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
 		import vibe.internal.meta.codegen : CloneFunction;
 
 		private alias __Info = InterfaceInfo!I;
-		private InterfaceInfo!I* __infos = new __Info(0);
+		private InterfaceInfo!I* __infos;
+
+		this()
+		{
+		    __infos = new __Info(0);
+		}
 	};
 
     // generate sub interface methods
