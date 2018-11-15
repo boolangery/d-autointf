@@ -359,6 +359,7 @@ unittest
     static assert(Info.staticMethods[0].parameters[0].name == "number");
 }
 
+
 /// Static informations about a method.
 struct StaticMethodInfo
 {
@@ -389,66 +390,30 @@ string autoImplementMethods(I, alias ExecuteMethod)()
 {
     import std.array : join;
     import std.string : format;
-    import std.traits : fullyQualifiedName, isInstanceOf, ParameterIdentifierTuple;
+    import std.traits : ParameterIdentifierTuple;
 
     alias Info = InterfaceInfo!I;
 
+    // add required import
     string ret = q{
         import vibe.internal.meta.codegen : CloneFunction;
-
-        private alias __Info = InterfaceInfo!I;
-        private InterfaceInfo!I* __infos;
-
-        this()
-        {
-            __infos = new __Info(0);
-        }
     };
-
-    // generate sub interface methods
-    foreach (i, SI; Info.SubInterfaceTypes)
-    {
-        alias F = Info.SubInterfaceFunctions[i];
-        alias RT = ReturnType!F;
-        alias ParamNames = ParameterIdentifierTuple!F;
-        static if (ParamNames.length == 0)
-            enum pnames = "";
-        else
-            enum pnames = ", " ~ [ParamNames].join(", ");
-        static if (isInstanceOf!(Collection, RT))
-        {
-            ret ~= q{
-                mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
-                    return Collection!(%2$s)(m_subInterfaces[%1$s]%3$s);
-                });
-            }.format(i, fullyQualifiedName!SI, pnames);
-        }
-        else
-        {
-            ret ~= q{
-                mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
-                    return m_subInterfaces[%1$s];
-                });
-            }.format(i);
-        }
-    }
 
     // generate method implementation
     foreach (i, F; Info.Methods)
     {
         alias ParamNames = ParameterIdentifierTuple!F;
+
         static if (ParamNames.length == 0)
             enum pnames = "";
         else
             enum pnames = [ParamNames].join(", ");
 
         ret ~= q{
-            mixin CloneFunction!(__Info.Methods[%1$s], q{
-                import std.traits : ReturnType;
-                alias RT = ReturnType!(__Info.Methods[%1$s]);
-                return %3$s!(I, RT, %1$s)(*__infos, %2$s);
-            });
-        }.format(i, pnames, __traits(identifier, ExecuteMethod));
+            mixin CloneFunction!(%3$s, q{
+                return %2$s!(%3$s)(%1$s);
+            }, true);
+        }.format(pnames, __traits(identifier, ExecuteMethod), __traits(identifier, F));
     }
 
     return ret;
@@ -458,16 +423,14 @@ unittest
 {
     class AutoFunctionName(I) : I
     {
-        private RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info, ARGS arg)
+        private ReturnType!Func executeMethod(alias Func, ARGS...)(ARGS arg)
         {
             import std.traits;
             import std.conv : to;
 
             // retrieve some compile time informations
-            alias Func = info.Methods[n];
             alias RT = ReturnType!Func;
             alias PTT = ParameterTypeTuple!Func;
-            auto route = info.methods[n];
 
             string ret;
 
@@ -476,7 +439,7 @@ unittest
                 ret ~= to!string(arg[i]);
             }
 
-            return route.name ~ ret;
+            return __traits(identifier, Func) ~ ret;
         }
 
         mixin(autoImplementMethods!(I, executeMethod));
@@ -495,7 +458,7 @@ unittest
 
     interface IAPI : ISubAPi
     {
-        string hello(int number, string str);
+        @("foo") string hello(int number, string str);
 
         string helloWorld();
     }
