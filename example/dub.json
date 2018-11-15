@@ -4,7 +4,7 @@
 		"Eliott Dumeix"
 	],
 	"dependencies": {
-		"autointf": "~master"
+		"autointf": {"path": "../"}
 	},
 	"description": "Example application for autointf",
 	"copyright": "Copyright © 2018, Eliott Dumeix",

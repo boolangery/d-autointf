@@ -6,27 +6,26 @@ class AutoJsonRpc(I) : I
 {
     private int id;
 
-    private RT executeMethod(I, RT, int n, ARGS...)(ref InterfaceInfo!I info, ARGS args)
+    private ReturnType!Func executeMethod(alias Func, ARGS...)(ARGS args)
     {
         import std.traits;
         import std.array : join;
         import std.conv : to;
 
         // retrieve some compile time informations
-        alias Func  = info.Methods[n];
         alias RT    = ReturnType!Func;
         alias PTT   = ParameterTypeTuple!Func;
-        auto method = info.methods[n];
+        enum  Name  = __traits(identifier, Func);
 
         string[] params;
         foreach (i, PT; PTT)
             params ~= to!string(args[i]);
 
-        return `{"jsonrpc": "2.0", "method": "` ~ method.name ~ `", "params": [`
+        return `{"jsonrpc": "2.0", "method": "` ~ Name ~ `", "params": [`
             ~ params.join(",") ~ `], "id": ` ~ (id++).to!string() ~ "}";
     }
 
-    mixin(autoImplementMethods!I());
+    mixin(autoImplementMethods!(I, executeMethod)());
 }
 
 
