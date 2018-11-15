@@ -88,28 +88,10 @@ struct InterfaceInfo(T) if (is(T == class) || is(T == interface))
     else
         static const StaticMethodInfo[0] staticMethods;
 
-    /** Aliases for each sub interface method (Compile-time).
-    This array has the same number of entries as `subInterfaces` and
-    `SubInterfaceTypes`. */
-    alias SubInterfaceFunctions = getSubInterfaceFunctions!();
-
-    /** The type of each sub interface (Compile-time).
-    This array has the same number of entries as `subInterfaces` and
-    `SubInterfaceFunctions`. */
-    alias SubInterfaceTypes = GetSubInterfaceTypes!();
-
-    enum subInterfaceCount = SubInterfaceFunctions.length;
-
-    /** Information about sub interfaces (Runtime).
-    This array has the same number of entries as `SubInterfaceFunctions` and
-    `SubInterfaceTypes`. */
-    SubInterface[subInterfaceCount] subInterfaces;
-
     /// Fills the struct with information.
     this(int dummy)
     {
         computeMethods();
-        computeSubInterfaces();
     }
 
     // copying this struct is costly, so we forbid it
@@ -142,26 +124,6 @@ struct InterfaceInfo(T) if (is(T == class) || is(T == interface))
 
             methods[si] = route;
         }
-    }
-
-    private void computeSubInterfaces()
-    {
-        foreach (i, func; SubInterfaceFunctions)
-        {
-            enum meta = extractHTTPMethodAndName!(func, false)();
-
-            static if (meta.hadPathUDA)
-                string url = meta.url;
-            else
-                string url = computeDefaultPath!func(meta.url);
-
-            SubInterface si;
-            si.context = context.dup;
-            si.context.baseURL = URL(concatURL(this.baseURL, url, true));
-            subInterfaces[i] = si;
-        }
-
-        assert(subInterfaces.length == SubInterfaceFunctions.length);
     }
 
     // ////////////////////////////////////////////////////////////////////////
@@ -271,52 +233,6 @@ struct InterfaceInfo(T) if (is(T == class) || is(T == interface))
 
         return ret;
     }
-
-    private template getSubInterfaceFunctions()
-    {
-        template Impl(size_t idx)
-        {
-            static if (idx < Members.length)
-            {
-                alias SI = SubInterfaceType!(Members[idx]);
-                static if (!is(SI == void))
-                {
-                    alias Impl = TypeTuple!(Members[idx], Impl!(idx + 1));
-                }
-                else
-                {
-                    alias Impl = Impl!(idx + 1);
-                }
-            }
-            else
-                alias Impl = TypeTuple!();
-        }
-
-        alias getSubInterfaceFunctions = Impl!0;
-    }
-
-    private template GetSubInterfaceTypes()
-    {
-        template Impl(size_t idx)
-        {
-            static if (idx < Members.length)
-            {
-                alias SI = SubInterfaceType!(Members[idx]);
-                static if (!is(SI == void))
-                {
-                    alias Impl = TypeTuple!(SI, Impl!(idx + 1));
-                }
-                else
-                {
-                    alias Impl = Impl!(idx + 1);
-                }
-            }
-            else
-                alias Impl = TypeTuple!();
-        }
-
-        alias GetSubInterfaceTypes = Impl!0;
-    }
 }
 
 ///
@@ -347,7 +263,6 @@ unittest
     assert(info.methods[0].name == "hello");
     assert(info.methods[0].parameters.length == 1);
     assert(info.methods[0].parameters[0].name == "number");
-    assert(info.subInterfaceCount == 0);
 
     // Compile time
     static assert(Info.Members.length == 2);
