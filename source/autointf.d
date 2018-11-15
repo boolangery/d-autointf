@@ -1,8 +1,8 @@
 /**
-	Some tools to help to auto-generate interface implementation.
+    Some tools to help to auto-generate interface implementation.
 
-	Copyright: © 2018 Eliott Dumeix
-	License: Subject to the terms of the MIT license, as written in the included LICENSE.txt file.
+    Copyright: © 2018 Eliott Dumeix
+    License: Subject to the terms of the MIT license, as written in the included LICENSE.txt file.
 */
 module autointf;
 
@@ -22,7 +22,7 @@ NoAutoImplementMethod noAutoImplement() @safe
 }
 
 /// attributes utils
-private enum isDisabledMethod(alias M) = !hasUDA!(M, NoAutoImplementMethod);
+private enum isEnabledMethod(alias M) = !hasUDA!(M, NoAutoImplementMethod);
 
 /// Base class for creating a context conserved during the invocation process.
 class UserContext
@@ -36,12 +36,11 @@ struct SubInterface
 
 /// Provides all necessary informations to implement an automated interface or class.
 /// inspired by /web/vibe/web/internal/rest/common.d
-struct InterfaceInfo(T)
-        if (is(T == class) || is(T == interface))
+struct InterfaceInfo(T) if (is(T == class) || is(T == interface))
 {
 @safe:
 
-    import std.meta : anySatisfy, Filter;
+    import std.meta : Filter;
     import std.traits : FunctionTypeOf, InterfacesTuple, MemberFunctionsTuple,
         ParameterIdentifierTuple, ParameterStorageClass,
         ParameterStorageClassTuple, ParameterTypeTuple, ReturnType;
@@ -51,12 +50,14 @@ struct InterfaceInfo(T)
     import vibe.internal.meta.uda;
 
     // determine the implementation interface I and check for validation errors
-    private alias BaseInterfaces = InterfacesTuple!T;
+    alias BaseInterfaces = InterfacesTuple!T;
+
+    // some static checks
     static assert(BaseInterfaces.length > 0 || is(T == interface),
-            "Cannot register type '" ~ T.stringof ~ "' because it doesn't implement an interface");
+        "Cannot get interface infos for type '" ~ T.stringof ~ "' because it doesn't implement an interface");
     static if (BaseInterfaces.length > 1)
         pragma(msg, "Type '" ~ T.stringof
-                ~ "' implements more than one interface: make sure the one describing the auto interface is the first one");
+            ~ "' implements more than one interface: make sure the one describing the auto interface is the first one");
 
     // alias the base interface
     static if (is(T == interface))
@@ -64,55 +65,47 @@ struct InterfaceInfo(T)
     else
         alias I = BaseInterfaces[0];
 
-
-    /// The name of each interface member
+    /// The name of each interface member (Runtime).
     enum memberNames = [__traits(allMembers, I)];
 
-    /// Aliases to all interface methods
-    alias AllMethods = GetAllMethods!();
+    /// Aliases to all interface methods (Compile-time).
+    alias Members = GetMembers!();
 
-    /** Aliases for each route method
-		This tuple has the same number of entries as `routes`.
-	*/
+    /** Aliases for each method (Compile-time).
+    This tuple has the same number of entries as `methods`. */
     alias Methods = GetMethods!();
 
+    /// Number of methods (Runtime).
     enum methodCount = Methods.length;
 
-    /** Information about each route
-		This array has the same number of fields as `RouteFunctions`
-	*/
+    /** Information about each route (Runtime).
+    This array has the same number of fields as `RouteFunctions`. */
     MethodInfo[methodCount] methods;
 
-    /// Static (compile-time) information about each route
+    /// Static information about each route (Compile-time).
     static if (methodCount)
         static const StaticMethodInfo[methodCount] staticMethods = computeStaticRoutes();
     else
         static const StaticMethodInfo[0] staticMethods;
 
-    /** Aliases for each sub interface method
-		This array has the same number of entries as `subInterfaces` and
-		`SubInterfaceTypes`.
-	*/
+    /** Aliases for each sub interface method (Compile-time).
+    This array has the same number of entries as `subInterfaces` and
+    `SubInterfaceTypes`. */
     alias SubInterfaceFunctions = getSubInterfaceFunctions!();
 
-    /** The type of each sub interface
-		This array has the same number of entries as `subInterfaces` and
-		`SubInterfaceFunctions`.
-	*/
+    /** The type of each sub interface (Compile-time).
+    This array has the same number of entries as `subInterfaces` and
+    `SubInterfaceFunctions`. */
     alias SubInterfaceTypes = GetSubInterfaceTypes!();
 
     enum subInterfaceCount = SubInterfaceFunctions.length;
 
-    /** Information about sub interfaces
-		This array has the same number of entries as `SubInterfaceFunctions` and
-		`SubInterfaceTypes`.
-	*/
+    /** Information about sub interfaces (Runtime).
+    This array has the same number of entries as `SubInterfaceFunctions` and
+    `SubInterfaceTypes`. */
     SubInterface[subInterfaceCount] subInterfaces;
 
-    /** Fills the struct with information.
-		Params:
-			settings = Optional settings object.
-	*/
+    /// Fills the struct with information.
     this(int dummy)
     {
         computeMethods();
@@ -185,7 +178,7 @@ struct InterfaceInfo(T)
             alias SubInterfaceType = void;
     }
 
-    private template GetAllMethods()
+    private template GetMembers()
     {
         template Impl(size_t idx)
         {
@@ -193,8 +186,7 @@ struct InterfaceInfo(T)
             {
                 enum name = memberNames[idx];
                 static if (name.length != 0)
-                    alias Impl = TypeTuple!(Filter!(isDisabledMethod,
-                            MemberFunctionsTuple!(I, name)), Impl!(idx + 1));
+                    alias Impl = TypeTuple!(MemberFunctionsTuple!(I, name), Impl!(idx + 1));
                 else
                     alias Impl = Impl!(idx + 1);
             }
@@ -202,18 +194,18 @@ struct InterfaceInfo(T)
                 alias Impl = TypeTuple!();
         }
 
-        alias GetAllMethods = Impl!0;
+        alias GetMembers = Impl!0;
     }
 
     private template GetMethods()
     {
         template Impl(size_t idx)
         {
-            static if (idx < AllMethods.length)
+            static if (idx < Members.length)
             {
-                alias F = AllMethods[idx];
+                alias F = Members[idx];
                 alias SI = SubInterfaceType!F;
-                static if (is(SI == void))
+                static if (is(SI == void) && isEnabledMethod!F)
                     alias Impl = TypeTuple!(F, Impl!(idx + 1));
                 else
                     alias Impl = Impl!(idx + 1);
@@ -284,12 +276,12 @@ struct InterfaceInfo(T)
     {
         template Impl(size_t idx)
         {
-            static if (idx < AllMethods.length)
+            static if (idx < Members.length)
             {
-                alias SI = SubInterfaceType!(AllMethods[idx]);
+                alias SI = SubInterfaceType!(Members[idx]);
                 static if (!is(SI == void))
                 {
-                    alias Impl = TypeTuple!(AllMethods[idx], Impl!(idx + 1));
+                    alias Impl = TypeTuple!(Members[idx], Impl!(idx + 1));
                 }
                 else
                 {
@@ -307,9 +299,9 @@ struct InterfaceInfo(T)
     {
         template Impl(size_t idx)
         {
-            static if (idx < AllMethods.length)
+            static if (idx < Members.length)
             {
-                alias SI = SubInterfaceType!(AllMethods[idx]);
+                alias SI = SubInterfaceType!(Members[idx]);
                 static if (!is(SI == void))
                 {
                     alias Impl = TypeTuple!(SI, Impl!(idx + 1));
@@ -325,6 +317,46 @@ struct InterfaceInfo(T)
 
         alias GetSubInterfaceTypes = Impl!0;
     }
+}
+
+///
+unittest
+{
+    import std.typecons : tuple;
+    import std.traits;
+
+    @("api")
+    interface IAPI
+    {
+        @("value")
+        string hello(int number);
+
+        @noAutoImplement()
+        void disabledMethod();
+    }
+
+    alias Info = InterfaceInfo!IAPI; // Compile-time infos
+    auto info = new Info(0); // Runtime infos
+
+    // Runtime infos
+    assert(info.memberNames.length == 2);
+    assert(info.memberNames[0] == "hello");
+    assert(info.memberNames[1] == "disabledMethod");
+    assert(info.methodCount == 1 );
+    assert(info.methods.length == 1);
+    assert(info.methods[0].name == "hello");
+    assert(info.methods[0].parameters.length == 1);
+    assert(info.methods[0].parameters[0].name == "number");
+    assert(info.subInterfaceCount == 0);
+
+    // Compile time
+    static assert(Info.Members.length == 2);
+    static assert(Info.Methods.length == 1);
+
+    static assert(Info.staticMethods.length == 1);
+    static assert(Info.staticMethods[0].name == "hello");
+    static assert(Info.staticMethods[0].parameters.length == 1);
+    static assert(Info.staticMethods[0].parameters[0].name == "number");
 }
 
 /// Static informations about a method.
@@ -353,59 +385,25 @@ struct ParameterInfo
     string name;
 }
 
-unittest
-{
-    import std.typecons : tuple;
-    import std.traits;
-
-    @("api")
-    interface IAPI
-    {
-        @("value")
-        string hello(int number);
-
-        @noAutoImplement()
-        void disabledMethod();
-    }
-
-    alias Info = InterfaceInfo!IAPI;
-    auto info = new Info(0);
-
-    static assert(Info.memberNames.length == 2);
-    static assert(Info.memberNames[0] == "hello");
-    static assert(Info.memberNames[1] == "disabledMethod");
-
-    static assert(Info.Methods.length == 1);
-
-    alias Func = Info.Methods[0];
-    alias RT = ReturnType!Func;
-    alias PTT = ParameterTypeTuple!Func;
-
-    static assert(is(RT == string));
-    static assert(PTT.length == 1);
-    static assert(is(PTT[0] == int));
-}
-
-string autoImplementMethods(I)(string globalMethodName = "executeMethod")
+string autoImplementMethods(I, alias ExecuteMethod)()
 {
     import std.array : join;
     import std.string : format;
-    import std.traits : fullyQualifiedName, isInstanceOf,
-        ParameterIdentifierTuple;
+    import std.traits : fullyQualifiedName, isInstanceOf, ParameterIdentifierTuple;
 
     alias Info = InterfaceInfo!I;
 
     string ret = q{
-		import vibe.internal.meta.codegen : CloneFunction;
+        import vibe.internal.meta.codegen : CloneFunction;
 
-		private alias __Info = InterfaceInfo!I;
-		private InterfaceInfo!I* __infos;
+        private alias __Info = InterfaceInfo!I;
+        private InterfaceInfo!I* __infos;
 
-		this()
-		{
-		    __infos = new __Info(0);
-		}
-	};
+        this()
+        {
+            __infos = new __Info(0);
+        }
+    };
 
     // generate sub interface methods
     foreach (i, SI; Info.SubInterfaceTypes)
@@ -420,22 +418,22 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
         static if (isInstanceOf!(Collection, RT))
         {
             ret ~= q{
-					mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
-						return Collection!(%2$s)(m_subInterfaces[%1$s]%3$s);
-					});
-				}.format(i, fullyQualifiedName!SI, pnames);
+                mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
+                    return Collection!(%2$s)(m_subInterfaces[%1$s]%3$s);
+                });
+            }.format(i, fullyQualifiedName!SI, pnames);
         }
         else
         {
             ret ~= q{
-					mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
-						return m_subInterfaces[%1$s];
-					});
-				}.format(i);
+                mixin CloneFunction!(__Info.SubInterfaceFunctions[%1$s], q{
+                    return m_subInterfaces[%1$s];
+                });
+            }.format(i);
         }
     }
 
-    // generate route methods
+    // generate method implementation
     foreach (i, F; Info.Methods)
     {
         alias ParamNames = ParameterIdentifierTuple!F;
@@ -445,17 +443,16 @@ string autoImplementMethods(I)(string globalMethodName = "executeMethod")
             enum pnames = [ParamNames].join(", ");
 
         ret ~= q{
-			mixin CloneFunction!(__Info.Methods[%1$s], q{
-				import std.traits : ReturnType;
-        		alias RT = ReturnType!(__Info.Methods[%1$s]);
-				return %3$s!(I, RT, %1$s)(*__infos, %2$s);
-			});
-		}.format(i, pnames, globalMethodName);
+            mixin CloneFunction!(__Info.Methods[%1$s], q{
+                import std.traits : ReturnType;
+                alias RT = ReturnType!(__Info.Methods[%1$s]);
+                return %3$s!(I, RT, %1$s)(*__infos, %2$s);
+            });
+        }.format(i, pnames, __traits(identifier, ExecuteMethod));
     }
 
     return ret;
 }
-
 
 unittest
 {
@@ -482,7 +479,7 @@ unittest
             return route.name ~ ret;
         }
 
-        mixin(autoImplementMethods!I());
+        mixin(autoImplementMethods!(I, executeMethod));
     }
 
     interface ISubAPi
