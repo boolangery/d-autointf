@@ -7,6 +7,6 @@
 	"license": "MIT",
 	"targetType": "library",
 	"dependencies": {
-		"vibe-d:utils": "~>0.8.4"
+		"vibe-d:utils": "*"
 	}
 }
