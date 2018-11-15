@@ -9,6 +9,8 @@ module autointf;
 import std.traits : hasUDA;
 import vibe.internal.meta.uda : onlyAsUda;
 
+public import std.traits : ReturnType;
+
 /// Methods marked with this attribute will not be auto implemented.
 package struct NoAutoImplementMethod
 {
