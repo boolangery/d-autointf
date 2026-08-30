@@ -327,10 +327,10 @@ string autoImplementMethods(I, alias ExecuteMethod)()
             enum pnames = [ParamNames].join(", ");
 
         ret ~= q{
-            mixin CloneFunction!(%3$s, q{
-                return %2$s!(%3$s)(%1$s);
+            mixin CloneFunction!(InterfaceInfo!(I).Methods[%3$s], q{
+                return %2$s!(InterfaceInfo!(I).Methods[%3$s])(%1$s);
             }, true);
-        }.format(pnames, __traits(identifier, ExecuteMethod), __traits(identifier, F));
+        }.format(pnames, __traits(identifier, ExecuteMethod), i);
     }
 
     return ret;
@@ -385,4 +385,43 @@ unittest
     assert(api.hello(42, "foo") == "hello42foo");
     assert(api.helloWorld() == "helloWorld");
     assert(api.getNumber(12) == "getNumber12");
+}
+
+// regression test for https://github.com/boolangery/d-autointf/issues/1
+// overloaded interface methods used to collapse to the same ambiguous
+// symbol, leaving one overload unimplemented.
+unittest
+{
+    class AutoFunctionName(I) : I
+    {
+        private ReturnType!Func executeMethod(alias Func, ARGS...)(ARGS arg)
+        {
+            import std.traits;
+            import std.conv : to;
+
+            alias PTT = ParameterTypeTuple!Func;
+
+            string ret;
+
+            foreach (i, PT; PTT)
+            {
+                ret ~= to!string(arg[i]);
+            }
+
+            return __traits(identifier, Func) ~ "/" ~ to!string(PTT.length) ~ ret;
+        }
+
+        mixin(autoImplementMethods!(I, executeMethod));
+    }
+
+    interface IAPI
+    {
+        string helloWorld();
+        string helloWorld(int number, int number2);
+    }
+
+    auto api = new AutoFunctionName!IAPI();
+
+    assert(api.helloWorld() == "helloWorld/0");
+    assert(api.helloWorld(1, 2) == "helloWorld/212");
 }
